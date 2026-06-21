@@ -124,14 +124,18 @@ fun MainScreen(repository: DrinkRepository) {
                     selectedType = selectedDrinkType,
                     onSelectedTypeChanged = { selectedDrinkType = it },
                     onAddDrink = { drinkType, amount ->
-                        val record = DrinkRecord(
+                        val newRecord = DrinkRecord(
                             drinkType = drinkType.name,
                             amountMl = amount,
                             abv = drinkType.abvDefault,
-                            alcoholGrams = drinkType.abvDefault,
                             date = today.toString()
-                        ).copy(alcoholGrams = record.calcAlcoholGrams())
-                        repository.addDrinkRecord(record)
+                        ).copy(alcoholGrams = DrinkRecord(
+                            drinkType = drinkType.name,
+                            amountMl = amount,
+                            abv = drinkType.abvDefault,
+                            date = today.toString()
+                        ).calcAlcoholGrams())
+                        repository.addDrinkRecord(newRecord)
                         refreshData()
                     },
                     onRemoveRecord = { id ->

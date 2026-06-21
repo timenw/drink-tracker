@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.sp
 import com.timenw.drinktracker.data.model.*
 import com.timenw.drinktracker.ui.components.AlcoholProgressRing
 import com.timenw.drinktracker.ui.components.EmptyStateView
+import com.timenw.drinktracker.ui.components.SummaryCard
 import com.timenw.drinktracker.ui.theme.AlcoholDanger
 import com.timenw.drinktracker.ui.theme.AlcoholSafe
 import com.timenw.drinktracker.ui.theme.AlcoholWarning
