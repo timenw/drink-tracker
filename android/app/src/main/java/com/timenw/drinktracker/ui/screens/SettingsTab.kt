@@ -77,16 +77,16 @@ fun SettingsTab(
                 }
             }
 
-            // 饮酒目标
+            // 戒酒目标
             item {
-                Text("饮酒目标", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("戒酒目标", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             }
 
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "每日纯酒精目标: ${settings.dailyAlcoholTargetGrams.toInt()}g",
+                            text = "每日纯酒精上限: ${settings.dailyAlcoholTargetGrams.toInt()}g",
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Medium
                         )
@@ -94,11 +94,11 @@ fun SettingsTab(
                         Slider(
                             value = settings.dailyAlcoholTargetGrams,
                             onValueChange = { onSettingsChanged(settings.copy(dailyAlcoholTargetGrams = it)) },
-                            valueRange = 10f..50f,
-                            steps = 7
+                            valueRange = 5f..50f,
+                            steps = 8
                         )
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("10g", style = MaterialTheme.typography.labelSmall)
+                            Text("5g", style = MaterialTheme.typography.labelSmall)
                             Text("50g", style = MaterialTheme.typography.labelSmall)
                         }
                         Spacer(modifier = Modifier.height(8.dp))
@@ -107,79 +107,27 @@ fun SettingsTab(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    }
-                }
-            }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        HorizontalDivider()
+                        Spacer(modifier = Modifier.height(12.dp))
 
-            // 提醒设置
-            item {
-                Text("提醒设置", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            }
-
-            item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
+                        // 达到目标提醒开关
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("饮酒提醒", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                                Text("达到目标提醒", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                                 Text(
-                                    text = if (settings.reminderEnabled) "已开启" else "已关闭",
+                                    text = if (settings.targetEnabled) "已开启 — 超过目标时提醒" else "已关闭",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                             Switch(
-                                checked = settings.reminderEnabled,
-                                onCheckedChange = { onSettingsChanged(settings.copy(reminderEnabled = it)) }
+                                checked = settings.targetEnabled,
+                                onCheckedChange = { onSettingsChanged(settings.copy(targetEnabled = it)) }
                             )
-                        }
-
-                        if (settings.reminderEnabled) {
-                            Spacer(modifier = Modifier.height(12.dp))
-                            HorizontalDivider()
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Text("提醒间隔: ${settings.reminderIntervalMinutes} 分钟")
-                            Slider(
-                                value = settings.reminderIntervalMinutes.toFloat(),
-                                onValueChange = { onSettingsChanged(settings.copy(reminderIntervalMinutes = it.toInt())) },
-                                valueRange = 30f..240f,
-                                steps = 6
-                            )
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text("30分钟", style = MaterialTheme.typography.labelSmall)
-                                Text("240分钟", style = MaterialTheme.typography.labelSmall)
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-                            HorizontalDivider()
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Text("免打扰时段: ${settings.wakeUpHour}:00 - ${settings.sleepHour}:00")
-                            Row(modifier = Modifier.fillMaxWidth()) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("起床时间", style = MaterialTheme.typography.labelSmall)
-                                    Slider(
-                                        value = settings.wakeUpHour.toFloat(),
-                                        onValueChange = { onSettingsChanged(settings.copy(wakeUpHour = it.toInt())) },
-                                        valueRange = 5f..12f,
-                                        steps = 6
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(16.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("睡觉时间", style = MaterialTheme.typography.labelSmall)
-                                    Slider(
-                                        value = settings.sleepHour.toFloat(),
-                                        onValueChange = { onSettingsChanged(settings.copy(sleepHour = it.toInt())) },
-                                        valueRange = 20f..24f,
-                                        steps = 3
-                                    )
-                                }
-                            }
                         }
                     }
                 }

@@ -80,6 +80,56 @@ class DrinkRepository(private val context: Context) {
         return freq
     }
 
+    // ===== 按类别统计（从第一次到最后一次） =====
+    data class CategoryTotal(
+        val drinkType: String,
+        val totalMl: Int,
+        val totalAlcoholGrams: Float,
+        val drinkCount: Int,
+        val firstDate: String,
+        val lastDate: String,
+        val daysSpan: Int
+    )
+
+    fun getCategoryTotals(): List<CategoryTotal> {
+        // 扫描所有日期的记录（从最早到最近365天）
+        val today = LocalDate.now()
+        val earliestDate = today.minusDays(365)
+        val categoryMap = mutableMapOf<String, MutableList<DrinkRecord>>()
+
+        var date = earliestDate
+        while (!date.isAfter(today)) {
+            val records = getDrinkRecords(date)
+            records.forEach { record ->
+                categoryMap.getOrPut(record.drinkType) { mutableListOf() }.add(record)
+            }
+            date = date.plusDays(1)
+        }
+
+        return categoryMap.map { (typeName, records) ->
+            val totalMl = records.sumOf { it.amountMl }
+            val totalAlcohol = records.sumOf { it.alcoholGrams.toDouble() }.toFloat()
+            val dates = records.map { it.date }.sorted()
+            val firstDate = dates.firstOrNull() ?: today.toString()
+            val lastDate = dates.lastOrNull() ?: today.toString()
+            val daysSpan = try {
+                val first = LocalDate.parse(firstDate)
+                val last = LocalDate.parse(lastDate)
+                java.time.temporal.ChronoUnit.DAYS.between(first, last).toInt()
+            } catch (e: Exception) { 0 }
+
+            CategoryTotal(
+                drinkType = typeName,
+                totalMl = totalMl,
+                totalAlcoholGrams = totalAlcohol,
+                drinkCount = records.size,
+                firstDate = firstDate,
+                lastDate = lastDate,
+                daysSpan = daysSpan
+            )
+        }.sortedByDescending { it.totalMl }
+    }
+
     // ===== 设置 =====
     fun getSettings(): UserSettings {
         val json = prefs.getString("settings", null)

@@ -12,16 +12,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.timenw.drinktracker.data.model.DailyDrinkSummary
 import com.timenw.drinktracker.data.model.DrinkType
+import com.timenw.drinktracker.data.repository.DrinkRepository
 import com.timenw.drinktracker.ui.components.SummaryCard
 import com.timenw.drinktracker.ui.theme.AlcoholDanger
 import com.timenw.drinktracker.ui.theme.AlcoholSafe
-import com.timenw.drinktracker.ui.theme.AlcoholWarning
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -30,7 +28,8 @@ import java.util.*
 fun StatsTab(
     weeklyData: List<DailyDrinkSummary>,
     monthlyData: List<DailyDrinkSummary>,
-    drinkFrequency: Map<String, Int>
+    drinkFrequency: Map<String, Int>,
+    categoryTotals: List<DrinkRepository.CategoryTotal>
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         CenterAlignedTopAppBar(
@@ -94,9 +93,101 @@ fun StatsTab(
                 }
             }
 
-            // 酒类偏好
+            // ===== 每类酒总饮用统计（从第一次到最后一次） =====
             item {
-                Text("酒类偏好", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("各类酒总饮用统计", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "统计时间：从第一次饮酒记录到最后一次",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            if (categoryTotals.isEmpty()) {
+                item {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = "还没有饮酒记录，开始记录啤酒吧 🍺",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(24.dp)
+                        )
+                    }
+                }
+            } else {
+                items(categoryTotals.size) { index ->
+                    val ct = categoryTotals[index]
+                    val drinkType = try { DrinkType.valueOf(ct.drinkType) } catch (e: Exception) { DrinkType.OTHER }
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            // 酒类名称和图标
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(text = drinkType.emoji, style = MaterialTheme.typography.headlineSmall)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = drinkType.displayName,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // 统计数据
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("总容量", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("${ct.totalMl}ml", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("纯酒精", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("${ct.totalAlcoholGrams.toInt()}g", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("饮用次数", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("${ct.drinkCount}次", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+                            HorizontalDivider()
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // 时间跨度
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("首次饮用", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(
+                                        text = formatDateShort(ct.firstDate),
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("最近饮用", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(
+                                        text = formatDateShort(ct.lastDate),
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("时间跨度", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(
+                                        text = if (ct.daysSpan == 0) "首次" else "${ct.daysSpan}天",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 酒类偏好（最近30天）
+            item {
+                Text("酒类偏好（近30天）", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Spacer(modifier = Modifier.height(8.dp))
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
@@ -158,6 +249,13 @@ fun StatsTab(
             item { Spacer(modifier = Modifier.height(16.dp)) }
         }
     }
+}
+
+private fun formatDateShort(dateStr: String): String {
+    return try {
+        val parts = dateStr.split("-")
+        if (parts.size == 3) "${parts[1]}/${parts[2]}" else dateStr
+    } catch (e: Exception) { dateStr }
 }
 
 @Composable

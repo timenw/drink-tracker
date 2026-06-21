@@ -24,12 +24,13 @@ import androidx.navigation.compose.rememberNavController
 import com.timenw.drinktracker.data.model.*
 import com.timenw.drinktracker.data.repository.DrinkRepository
 import com.timenw.drinktracker.ui.screens.*
-import com.timenw.drinktracker.ui.theme.DrinkTrackerTheme
+import com.timenw.drinktracker.notification.NotificationHelper
 import java.time.LocalDate
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var repository: DrinkRepository
+    private var hasNotifiedTarget = false
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -38,6 +39,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         repository = DrinkRepository(applicationContext)
+        NotificationHelper.createNotificationChannel(this)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
@@ -66,7 +68,8 @@ fun MainScreen(repository: DrinkRepository) {
     val navController = rememberNavController()
     val screens = listOf(Screen.Home, Screen.Stats, Screen.Settings)
 
-    var selectedDrinkType by remember { mutableStateOf(DrinkType.BEER_REGULAR) }
+    var selectedDrinkType by remember { mutableStateOf(DrinkType.BEER) }
+    var selectedAbv by remember { mutableFloatStateOf(DrinkType.BEER.abvDefault) }
     var settings by remember { mutableStateOf(repository.getSettings()) }
     val today = remember { LocalDate.now() }
 
@@ -75,12 +78,14 @@ fun MainScreen(repository: DrinkRepository) {
     var records by remember { mutableStateOf(repository.getDrinkRecords(today)) }
     var weeklyData by remember { mutableStateOf(repository.getWeeklyData()) }
     var drinkFrequency by remember { mutableStateOf(repository.getDrinkFrequency()) }
+    var categoryTotals by remember { mutableStateOf(repository.getCategoryTotals()) }
 
     fun refreshData() {
         summary = repository.getDailySummary(today)
         records = repository.getDrinkRecords(today)
         weeklyData = repository.getWeeklyData()
         drinkFrequency = repository.getDrinkFrequency()
+        categoryTotals = repository.getCategoryTotals()
     }
 
     Scaffold(
@@ -122,21 +127,41 @@ fun MainScreen(repository: DrinkRepository) {
                     targetGrams = settings.dailyAlcoholTargetGrams,
                     records = records,
                     selectedType = selectedDrinkType,
-                    onSelectedTypeChanged = { selectedDrinkType = it },
-                    onAddDrink = { drinkType, amount ->
+                    selectedAbv = selectedAbv,
+                    onSelectedTypeChanged = { type ->
+                        selectedDrinkType = type
+                        selectedAbv = type.abvDefault
+                    },
+                    onSelectedAbvChanged = { selectedAbv = it },
+                    onAddDrink = { drinkType, amount, abv ->
                         val newRecord = DrinkRecord(
                             drinkType = drinkType.name,
                             amountMl = amount,
-                            abv = drinkType.abvDefault,
+                            abv = abv,
                             date = today.toString()
-                        ).copy(alcoholGrams = DrinkRecord(
-                            drinkType = drinkType.name,
-                            amountMl = amount,
-                            abv = drinkType.abvDefault,
-                            date = today.toString()
-                        ).calcAlcoholGrams())
+                        ).copy(
+                            alcoholGrams = DrinkRecord(
+                                drinkType = drinkType.name,
+                                amountMl = amount,
+                                abv = abv,
+                                date = today.toString()
+                            ).calcAlcoholGrams()
+                        )
                         repository.addDrinkRecord(newRecord)
                         refreshData()
+
+                        // 检查是否达到戒酒目标
+                        if (settings.targetEnabled && !hasNotifiedTarget) {
+                            val newSummary = repository.getDailySummary(today)
+                            if (newSummary.totalAlcoholGrams >= settings.dailyAlcoholTargetGrams) {
+                                NotificationHelper.sendTargetReachedNotification(
+                                    context = this@MainActivity,
+                                    currentGrams = newSummary.totalAlcoholGrams,
+                                    targetGrams = settings.dailyAlcoholTargetGrams
+                                )
+                                hasNotifiedTarget = true
+                            }
+                        }
                     },
                     onRemoveRecord = { id ->
                         repository.removeDrinkRecord(id, today)
@@ -148,7 +173,8 @@ fun MainScreen(repository: DrinkRepository) {
                 StatsTab(
                     weeklyData = weeklyData,
                     monthlyData = emptyList(),
-                    drinkFrequency = drinkFrequency
+                    drinkFrequency = drinkFrequency,
+                    categoryTotals = categoryTotals
                 )
             }
             composable(Screen.Settings.route) {

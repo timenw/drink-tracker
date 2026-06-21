@@ -31,12 +31,15 @@ fun DrinkHomeTab(
     targetGrams: Float,
     records: List<DrinkRecord>,
     selectedType: DrinkType,
+    selectedAbv: Float,
     onSelectedTypeChanged: (DrinkType) -> Unit,
-    onAddDrink: (DrinkType, Int) -> Unit,
+    onSelectedAbvChanged: (Float) -> Unit,
+    onAddDrink: (DrinkType, Int, Float) -> Unit,
     onRemoveRecord: (Long) -> Unit
 ) {
     var showCustomDialog by remember { mutableStateOf(false) }
     var customAmount by remember { mutableStateOf("") }
+    var customAbv by remember { mutableStateOf(selectedType.abvDefault.toString()) }
     var showTypeSelector by remember { mutableStateOf(false) }
 
     val formatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
@@ -81,7 +84,7 @@ fun DrinkHomeTab(
                     if (summary.totalAlcoholGrams > targetGrams) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "⚠️ 已超过建议饮酒量",
+                            text = "⚠️ 已超过戒酒目标",
                             style = MaterialTheme.typography.labelMedium,
                             color = AlcoholDanger
                         )
@@ -127,8 +130,42 @@ fun DrinkHomeTab(
             item {
                 DrinkTypeSelector(
                     selectedType = selectedType,
-                    onTypeSelected = { onSelectedTypeChanged(it) }
+                    onTypeSelected = {
+                        onSelectedTypeChanged(it)
+                        onSelectedAbvChanged(it.abvDefault)
+                    }
                 )
+            }
+
+            // 酒精度数设置
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "酒精度数: ${selectedAbv}%",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "参考范围: ${selectedType.abvMin}% ~ ${selectedType.abvMax}%",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Slider(
+                            value = selectedAbv,
+                            onValueChange = { onSelectedAbvChanged(it) },
+                            valueRange = selectedType.abvMin..selectedType.abvMax,
+                            steps = ((selectedType.abvMax - selectedType.abvMin) / 0.5f).toInt().coerceAtLeast(1)
+                        )
+                    }
+                }
             }
 
             // 快速添加按钮
@@ -143,14 +180,18 @@ fun DrinkHomeTab(
             item {
                 QuickAddGrid(
                     drinkType = selectedType,
-                    onAddDrink = onAddDrink
+                    onAddDrink = { amount -> onAddDrink(selectedType, amount, selectedAbv) }
                 )
             }
 
             // 自定义添加
             item {
                 OutlinedButton(
-                    onClick = { showCustomDialog = true },
+                    onClick = {
+                        customAmount = ""
+                        customAbv = selectedAbv.toString()
+                        showCustomDialog = true
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)
@@ -180,7 +221,7 @@ fun DrinkHomeTab(
                 }
             } else {
                 items(records.reversed(), key = { it.id }) { record ->
-                    val drinkType = try { DrinkType.valueOf(record.drinkType) } catch (e: Exception) { DrinkType.CUSTOM }
+                    val drinkType = try { DrinkType.valueOf(record.drinkType) } catch (e: Exception) { DrinkType.OTHER }
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
@@ -196,7 +237,7 @@ fun DrinkHomeTab(
                             Text(text = drinkType.emoji, fontSize = 20.sp, modifier = Modifier.padding(end = 12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "${drinkType.displayName} ${record.amountMl}ml",
+                                    text = "${drinkType.displayName} ${record.amountMl}ml (${record.abv}%)",
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.Medium
                                 )
@@ -225,13 +266,29 @@ fun DrinkHomeTab(
             title = { Text("自定义酒量") },
             text = {
                 Column {
-                    Text("酒类: ${selectedType.displayName} (${selectedType.abvDefault}%)")
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("酒类: ${selectedType.displayName}")
+                    Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
                         value = customAmount,
                         onValueChange = { customAmount = it.filter { c -> c.isDigit() } },
                         label = { Text("容量 (ml)") },
                         singleLine = true
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = customAbv,
+                        onValueChange = { newVal ->
+                            // 允许数字和小数点
+                            customAbv = newVal.filter { c -> c.isDigit() || c == '.' }
+                        },
+                        label = { Text("酒精度数 (%)") },
+                        singleLine = true
+                    )
+                    Text(
+                        text = "参考: ${selectedType.abvMin}%~${selectedType.abvMax}%",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp)
                     )
                 }
             },
@@ -239,8 +296,9 @@ fun DrinkHomeTab(
                 TextButton(
                     onClick = {
                         val ml = customAmount.toIntOrNull()
-                        if (ml != null && ml > 0) {
-                            onAddDrink(selectedType, ml)
+                        val abv = customAbv.toFloatOrNull()
+                        if (ml != null && ml > 0 && abv != null && abv >= 0) {
+                            onAddDrink(selectedType, ml, abv)
                             customAmount = ""
                             showCustomDialog = false
                         }
@@ -262,46 +320,41 @@ fun DrinkTypeSelector(
     onTypeSelected: (DrinkType) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val categories = DrinkCategory.values()
 
     Column {
-        // 当前选中的类型
         OutlinedButton(
             onClick = { expanded = !expanded },
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("${selectedType.emoji} ${selectedType.displayName} (${selectedType.abvDefault}%)")
+            Text("${selectedType.emoji} ${selectedType.displayName}  (参考 ${selectedType.abvDefault}%)")
         }
 
         if (expanded) {
             Spacer(modifier = Modifier.height(8.dp))
-            categories.forEach { category ->
-                val types = DrinkType.getByCategory(category)
-                if (types.isNotEmpty()) {
-                    Text(
-                        text = "${category.emoji} ${category.displayName}",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(vertical = 4.dp, horizontal = 8.dp)
-                    )
-                    types.forEach { type ->
-                        TextButton(
+            // 直接显示所有大类，按分组排列
+            val groups = listOf(
+                listOf(DrinkType.BEER, DrinkType.WINE, DrinkType.HUANGJIU, DrinkType.SAKE, DrinkType.CIDER),
+                listOf(DrinkType.BAIJIU, DrinkType.WHISKY, DrinkType.BRANDY, DrinkType.VODKA, DrinkType.RUM),
+                listOf(DrinkType.TEQUILA, DrinkType.GIN, DrinkType.SOJU, DrinkType.COCKTAIL, DrinkType.LIQUEUR, DrinkType.OTHER)
+            )
+            groups.forEach { group ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    group.forEach { type ->
+                        FilterChip(
+                            selected = selectedType == type,
                             onClick = {
                                 onTypeSelected(type)
                                 expanded = false
                             },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text("${type.emoji} ${type.displayName}")
-                                Text("${type.abvDefault}%", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
+                            label = { Text("${type.emoji} ${type.displayName}", style = MaterialTheme.typography.labelMedium) },
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
+                Spacer(modifier = Modifier.height(6.dp))
             }
         }
     }
@@ -310,7 +363,7 @@ fun DrinkTypeSelector(
 @Composable
 fun QuickAddGrid(
     drinkType: DrinkType,
-    onAddDrink: (DrinkType, Int) -> Unit
+    onAddDrink: (Int) -> Unit
 ) {
     // 根据酒类生成快速添加容量
     val amounts = when (drinkType.category) {
@@ -324,6 +377,7 @@ fun QuickAddGrid(
         DrinkCategory.COCKTAIL -> listOf(60, 120, 180, 240)
         DrinkCategory.LIQUEUR -> listOf(30, 60, 90, 120)
         DrinkCategory.HUANGJIU -> listOf(100, 150, 200, 500)
+        DrinkCategory.CIDER -> listOf(250, 330, 500, 750)
         DrinkCategory.OTHER -> listOf(100, 200, 300, 500)
     }
 
@@ -331,7 +385,6 @@ fun QuickAddGrid(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // 每行4个按钮
         val rows = amounts.chunked(4)
         rows.forEach { rowAmounts ->
             Row(
@@ -340,7 +393,7 @@ fun QuickAddGrid(
             ) {
                 rowAmounts.forEach { amount ->
                     FilledTonalButton(
-                        onClick = { onAddDrink(drinkType, amount) },
+                        onClick = { onAddDrink(amount) },
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp),
@@ -356,7 +409,6 @@ fun QuickAddGrid(
                         )
                     }
                 }
-                // 补齐空位
                 repeat(4 - rowAmounts.size) {
                     Spacer(modifier = Modifier.weight(1f))
                 }
