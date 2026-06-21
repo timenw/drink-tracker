@@ -66,7 +66,7 @@ enum class DrinkCategory(val displayName: String, val emoji: String) {
  */
 data class DrinkRecord(
     val id: Long = System.currentTimeMillis(),
-    val drinkType: String = DrinkType.BEER_REGULAR.name,
+    val drinkType: String = DrinkType.BEER.name,
     val amountMl: Int = 330,
     val abv: Float = 5f,
     val alcoholGrams: Float = 0f,

@@ -14,6 +14,7 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -25,12 +26,12 @@ import com.timenw.drinktracker.data.model.*
 import com.timenw.drinktracker.data.repository.DrinkRepository
 import com.timenw.drinktracker.ui.screens.*
 import com.timenw.drinktracker.notification.NotificationHelper
+import com.timenw.drinktracker.ui.theme.DrinkTrackerTheme
 import java.time.LocalDate
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var repository: DrinkRepository
-    private var hasNotifiedTarget = false
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -67,11 +68,13 @@ sealed class Screen(val route: String, val label: String, val selectedIcon: @Com
 fun MainScreen(repository: DrinkRepository) {
     val navController = rememberNavController()
     val screens = listOf(Screen.Home, Screen.Stats, Screen.Settings)
+    val context = LocalContext.current
 
     var selectedDrinkType by remember { mutableStateOf(DrinkType.BEER) }
     var selectedAbv by remember { mutableFloatStateOf(DrinkType.BEER.abvDefault) }
     var settings by remember { mutableStateOf(repository.getSettings()) }
     val today = remember { LocalDate.now() }
+    var hasNotifiedTarget by remember { mutableStateOf(false) }
 
     // 数据状态
     var summary by remember { mutableStateOf(repository.getDailySummary(today)) }
@@ -155,7 +158,7 @@ fun MainScreen(repository: DrinkRepository) {
                             val newSummary = repository.getDailySummary(today)
                             if (newSummary.totalAlcoholGrams >= settings.dailyAlcoholTargetGrams) {
                                 NotificationHelper.sendTargetReachedNotification(
-                                    context = this@MainActivity,
+                                    context = context,
                                     currentGrams = newSummary.totalAlcoholGrams,
                                     targetGrams = settings.dailyAlcoholTargetGrams
                                 )
